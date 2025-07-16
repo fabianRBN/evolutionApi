@@ -1,0 +1,38 @@
+name: Deploy Evolution API to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to EC2 via SSM
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{secrets.AWS_REGION}}
+      EC2_INSTANCE_ID: ${{secrets.EC2_INSTANCE_ID}}
+      WORKDIR: ${{secrets.EC2_WORKING_DIR}}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: ${{secrets.AWS_REGION}}
+
+      - name: Send deploy command to EC2 via SSM
+        run: |
+          aws ssm send-command \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy Evolution API" \
+            --parameters 'commands=[
+              "cd $WORKDIR",
+              "git pull origin main",
+              "docker-compose down",
+              "docker-compose up -d --build"
+            ]' \
+            --region $AWS_REGION
